@@ -14,6 +14,7 @@ AMBIGUOUS_CHARS = set("O0l1I")
 
 
 def _read_int(prompt: str) -> int:
+    # Simple numeric input loop with validation.
     while True:
         raw = input(prompt).strip()
         if not raw:
