@@ -85,6 +85,7 @@ def generate_password(
     if length < len(required_chars):
         raise ValueError("Length too short for required character groups.")
 
+    # Fill the remaining slots from the combined pool, then shuffle for uniform distribution.
     remaining = length - len(required_chars)
     chars = required_chars + [secrets.choice(pool) for _ in range(remaining)]
     secrets.SystemRandom().shuffle(chars)
@@ -117,6 +118,7 @@ def main() -> None:
             print("Output path cannot be empty.")
             return
 
+    # Generate the requested batch size with the same policy.
     try:
         passwords = [
             generate_password(
@@ -141,6 +143,7 @@ def main() -> None:
     if use_symbols:
         pool_size += len(string.punctuation)
 
+    # Entropy estimate uses pool size after exclusions.
     entropy = _entropy_bits(length, pool_size)
 
     label = "Generated password" if count == 1 else f"Generated passwords ({count})"
@@ -151,6 +154,7 @@ def main() -> None:
 
     if save_to_file:
         try:
+            # One password per line for easy import into vaults.
             with open(output_path, "w", encoding="utf-8") as handle:
                 handle.write("\n".join(passwords) + "\n")
             print(f"Saved to: {output_path}")
