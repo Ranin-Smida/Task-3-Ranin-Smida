@@ -1,167 +1,137 @@
-"""Enterprise random password generator."""
-
 from __future__ import annotations
 
-import math
 import secrets
 import string
+import customtkinter as ctk
+from tkinter import messagebox
 
 
 MIN_LENGTH = 8
-MAX_LENGTH = 64
-MAX_COUNT = 50
-AMBIGUOUS_CHARS = set("O0l1I")
+MAX_LENGTH = 32
 
 
-def _read_int(prompt: str) -> int:
-    # Simple numeric input loop with validation.
-    while True:
-        raw = input(prompt).strip()
-        if not raw:
-            print("Please enter a number.")
-            continue
-        try:
-            value = int(raw)
-        except ValueError:
-            print("That is not a valid integer.")
-            continue
-        return value
+def validate_length(value: str) -> int:
+	
+	value = value.strip()
+	if not value:
+		raise ValueError("Please enter a length.")
+
+	length = int(value)
+	if length < MIN_LENGTH or length > MAX_LENGTH:
+		raise ValueError(
+			f"Length must be between {MIN_LENGTH} and {MAX_LENGTH} characters."
+		)
+
+	return length
 
 
-def _read_yes_no(prompt: str, default: bool = True) -> bool:
-    suffix = "[Y/n]" if default else "[y/N]"
-    while True:
-        raw = input(f"{prompt} {suffix} ").strip().lower()
-        if not raw:
-            return default
-        if raw in {"y", "yes"}:
-            return True
-        if raw in {"n", "no"}:
-            return False
-        print("Please enter y or n.")
+def generate_password(length: int) -> str:
+	
+	alphabet = string.ascii_letters + string.digits
+	return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
-def _entropy_bits(length: int, pool_size: int) -> float:
-    if length <= 0 or pool_size <= 1:
-        return 0.0
-    return length * math.log2(pool_size)
+def on_generate(length_var: ctk.StringVar, output_var: ctk.StringVar) -> None:
 
+	try:
+		length = validate_length(length_var.get())
+	except ValueError as exc:
+		messagebox.showerror("Invalid Input", str(exc))
+		return
 
-def _filter_ambiguous(pool: str, exclude: bool) -> str:
-    if not exclude:
-        return pool
-    return "".join(ch for ch in pool if ch not in AMBIGUOUS_CHARS)
-
-
-def generate_password(
-    length: int,
-    use_letters: bool,
-    use_digits: bool,
-    use_symbols: bool,
-    require_each_selected: bool,
-    exclude_ambiguous: bool,
-) -> str:
-    pools: list[str] = []
-    required_chars: list[str] = []
-
-    if use_letters:
-        letters = _filter_ambiguous(string.ascii_letters, exclude_ambiguous)
-        pools.append(letters)
-        if require_each_selected:
-            required_chars.append(secrets.choice(letters))
-    if use_digits:
-        digits = _filter_ambiguous(string.digits, exclude_ambiguous)
-        pools.append(digits)
-        if require_each_selected:
-            required_chars.append(secrets.choice(digits))
-    if use_symbols:
-        pools.append(string.punctuation)
-        if require_each_selected:
-            required_chars.append(secrets.choice(string.punctuation))
-
-    if not pools:
-        raise ValueError("At least one character group must be enabled.")
-
-    pool = "".join(pools)
-    if length < len(required_chars):
-        raise ValueError("Length too short for required character groups.")
-
-    # Fill the remaining slots from the combined pool, then shuffle for uniform distribution.
-    remaining = length - len(required_chars)
-    chars = required_chars + [secrets.choice(pool) for _ in range(remaining)]
-    secrets.SystemRandom().shuffle(chars)
-    return "".join(chars)
+	output_var.set(generate_password(length))
 
 
 def main() -> None:
-    print("Enterprise Random Password Generator")
-    print("------------------------------------")
 
-    length = _read_int(f"Password length ({MIN_LENGTH}-{MAX_LENGTH}): ")
-    if length < MIN_LENGTH or length > MAX_LENGTH:
-        print(f"Length must be between {MIN_LENGTH} and {MAX_LENGTH}.")
-        return
+	ctk.set_appearance_mode("light")
+	ctk.set_default_color_theme("blue")
 
-    use_letters = _read_yes_no("Include letters?", default=True)
-    use_digits = _read_yes_no("Include digits?", default=True)
-    use_symbols = _read_yes_no("Include symbols?", default=True)
-    require_each = _read_yes_no("Require at least one from each selected group?", default=True)
-    exclude_ambiguous = _read_yes_no("Exclude ambiguous chars (O, 0, l, 1)?", default=False)
-    count = _read_int(f"How many passwords? (1-{MAX_COUNT}): ")
-    if count < 1 or count > MAX_COUNT:
-        print(f"Count must be between 1 and {MAX_COUNT}.")
-        return
-    save_to_file = _read_yes_no("Save passwords to a file?", default=False)
-    output_path = ""
-    if save_to_file:
-        output_path = input("Output file path (e.g., passwords.txt): ").strip()
-        if not output_path:
-            print("Output path cannot be empty.")
-            return
+	app = ctk.CTk()
+	app.geometry("460x420")
+	app.title("DecodeLabs Enterprise Password Generator")
+	app.resizable(False, False)
+	app.configure(fg_color="#F2EEE8")
 
-    # Generate the requested batch size with the same policy.
-    try:
-        passwords = [
-            generate_password(
-                length=length,
-                use_letters=use_letters,
-                use_digits=use_digits,
-                use_symbols=use_symbols,
-                require_each_selected=require_each,
-                exclude_ambiguous=exclude_ambiguous,
-            )
-            for _ in range(count)
-        ]
-    except ValueError as exc:
-        print(f"Error: {exc}")
-        return
+	font_family = "trebuchet ms"
 
-    pool_size = 0
-    if use_letters:
-        pool_size += len(_filter_ambiguous(string.ascii_letters, exclude_ambiguous))
-    if use_digits:
-        pool_size += len(_filter_ambiguous(string.digits, exclude_ambiguous))
-    if use_symbols:
-        pool_size += len(string.punctuation)
+	length_var = ctk.StringVar(value=str(MIN_LENGTH))
+	output_var = ctk.StringVar()
 
-    # Entropy estimate uses pool size after exclusions.
-    entropy = _entropy_bits(length, pool_size)
+	title_label = ctk.CTkLabel(
+		app,
+		text="Enterprise Random Password Generator",
+		font=(font_family, 20, "bold"),
+		text_color="#2B2A28",
+	)
+	title_label.pack(pady=(20, 8))
 
-    label = "Generated password" if count == 1 else f"Generated passwords ({count})"
-    print(f"\n{label}:")
-    for password in passwords:
-        print(password)
-    print(f"Entropy estimate: {entropy:.2f} bits")
+	hint_label = ctk.CTkLabel(
+		app,
+		text=f"Allowed range: {MIN_LENGTH}-{MAX_LENGTH}",
+		font=(font_family, 14),
+		text_color="#5F5A52",
+	)
+	hint_label.pack(pady=(0, 16))
 
-    if save_to_file:
-        try:
-            # One password per line for easy import into vaults.
-            with open(output_path, "w", encoding="utf-8") as handle:
-                handle.write("\n".join(passwords) + "\n")
-            print(f"Saved to: {output_path}")
-        except OSError as exc:
-            print(f"Could not write file: {exc}")
+	length_row = ctk.CTkFrame(app, fg_color="transparent")
+	length_row.pack(fill="x", padx=40, pady=6)
+
+	length_label = ctk.CTkLabel(
+		length_row,
+		text="Password length",
+		font=(font_family, 16),
+		text_color="#2B2A28",
+	)
+	length_label.pack(side="left")
+
+	length_entry = ctk.CTkEntry(
+		length_row,
+		textvariable=length_var,
+		height=36,
+		width=120,
+		font=(font_family, 16),
+		fg_color="#FFFDF9",
+		text_color="#2B2A28",
+		border_color="#BFAF9D",
+	)
+	length_entry.pack(side="right")
+	length_entry.focus_set()
+
+	generate_button = ctk.CTkButton(
+		app,
+		text="Generate Password",
+		command=lambda: on_generate(length_var, output_var),
+		height=42,
+		font=(font_family, 16, "bold"),
+		fg_color="#2F6B5F",
+		hover_color="#27564C",
+	)
+	generate_button.pack(pady=18)
+
+	output_label = ctk.CTkLabel(
+		app,
+		text="Generated password",
+		font=(font_family, 16),
+		text_color="#2B2A28",
+	)
+	output_label.pack(pady=(10, 6))
+
+	output_entry = ctk.CTkEntry(
+		app,
+		textvariable=output_var,
+		width=420,
+		height=40,
+		font=(font_family, 16),
+		fg_color="#FFFDF9",
+		text_color="#2B2A28",
+		border_color="#BFAF9D",
+		state="readonly",
+	)
+	output_entry.pack(pady=(0, 16))
+
+	app.mainloop()
 
 
 if __name__ == "__main__":
-    main()
+	main()
